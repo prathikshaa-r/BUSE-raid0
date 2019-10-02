@@ -37,7 +37,7 @@
 
 int dev_fd[2]; // file descriptors for two underlying block devices that make up
                // the RAID
-int block_size; // NOTE: other than truncating the resulting raid device,
+u_int32_t block_size; // NOTE: other than truncating the resulting raid device,
                 // block_size is ignored in this program; it is asked for and
                 // set in order to make it easier to adapt this code to
                 // RAID0/4/5/6.
@@ -55,20 +55,26 @@ static int xmp_read(void *buf, u_int32_t len, u_int64_t offset,
   off_t read_offset;
 
   while (len > 0) {
+    if(verbose)
+      fprintf(stderr, "R:loop:len: %u\n", len);
+    /* read_device = (offset / block_size) % 2; */
+    /* read_offset = offset / block_size; */
     read_device = (offset / block_size) % 2;
-    read_offset =
-        ((offset / block_size) / 2) * block_size + (offset % block_size);
+    read_offset = ((offset / block_size) / 2) * block_size +
+                  (offset % block_size);
 
-    /* fprintf(stderr, */
-    /*         "Offset: %lu, Len: %d, Device number: %d, Device Offset: %lu\n",
-     */
-    /*         offset, len, read_device, read_offset); */
-
+    if (len < block_size){
+      pread(dev_fd[read_device], buf, len, read_offset);
+      break;
+    }
     pread(dev_fd[read_device], buf, block_size, read_offset);
+    
     buf += block_size;
     offset += block_size;
     len -= block_size;
   }
+  if(verbose)
+    fprintf(stderr, "Exit\n");
   return 0;
 }
 
@@ -84,17 +90,18 @@ static int xmp_write(const void *buf, u_int32_t len, u_int64_t offset,
   off_t write_offset;
 
   while (len > 0) {
+    /* write_device = (offset / block_size) % 2; */
+    /* write_offset = offset / block_size; */
     write_device = (offset / block_size) % 2;
-    write_offset =
-        ((offset / block_size) / 2) * block_size + (offset % block_size);
+    write_offset = ((offset / block_size) / 2) * block_size +
+                   (offset % block_size);
 
-    /* fprintf(stderr, */
-    /*         "Offset: %lu, Len: %d, Buf: %s, Device number: %d, Device Offset:
-     * " */
-    /*         "%lu\n", */
-    /*         offset, len, (char *)buf, write_device, write_offset); */
-
+    if (len < block_size){
+      pwrite(dev_fd[write_device], buf, len, write_offset);
+      break;
+    }
     pwrite(dev_fd[write_device], buf, block_size, write_offset);
+
     buf += block_size;
     offset += block_size;
     len -= block_size;
